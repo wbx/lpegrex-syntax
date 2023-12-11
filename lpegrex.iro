@@ -1,0 +1,307 @@
+#################################################################
+## Iro
+################################################################ 
+##
+## * Press Ctrl + '+'/'-' To Zoom in
+## * Press Ctrl + S to save and recalculate... 
+## * Documents are saved to web storage.
+## * Only one save slot supported.
+## * Matches cannot span lines.
+## * Unicode chars must be defined in \u0000 to \uffff format.
+## * All matches must be contained by a single group ( ... )
+## * Look behinds not permitted, (?<= or (?<!
+## * Look forwards are permitted (?= or (?!
+## * Constants are defined as __my_const = (......)
+## * The \= format allows unescaped regular expressions
+## * Constants referenced by match \= $${__my_const}
+## * Constants can reference other constants
+## * You are free to delete all the default scopes.
+## * Twitter : ainslec , Web: http://eeyo.io/iro
+##
+################################################################
+
+name                   = lpegrex
+file_extensions []     = lpegrex;
+
+################################################################
+## Constants
+################################################################
+
+__NAME \= [A-Za-z_-][A-Za-z0-9_-]*
+
+################################################################
+## Styles
+################################################################
+
+styles [] {
+
+.operator : style {
+   color                = cyan
+   textmate_scope       = keyword.operator
+}
+
+.string : style {
+   color                 = brown
+   textmate_scope        = string
+}
+
+.predef : style {
+   color                 = gold
+   textmate_scope        = constant.language
+}
+
+.predeffn : style {
+   color                 = gold
+   textmate_scope        = support.function
+}
+
+.predefrule : style {
+   color                 = gold
+   textmate_scope        = variable.language
+}
+
+.capture : style {
+   color                 = blue
+   textmate_scope        = storage.type
+}
+
+.captureaux : style {
+   color                 = gold
+   textmate_scope        = support.macro
+}
+
+.comment : style {
+   color                 = light_green
+   italic                = true
+   textmate_scope        = comment
+}
+
+.illegal : style {
+   color                 = white
+   textmate_scope        = invalid
+}
+
+}
+
+#################################################
+## Parse contexts
+#################################################
+
+contexts [] {
+
+##############################################
+## Main Context - Entry point context
+##############################################
+
+main : context {
+
+   : include "ops" ;
+   : include "string" ;
+   : include "predef" ;
+   : include "predeffn" ;
+   : include "predefrule" ;
+   : include "capture" ;
+
+
+   : pattern {
+      regex          \= (--.*)
+      styles []       = .comment;
+   }
+}
+
+#################################################
+## End of Contexts
+#################################################
+
+# narrow first to wide
+
+ops : context {
+   # grammar
+   : pattern {
+      regex          \= (<--|<-\||<==|<-)
+      styles []       = .operator;
+   }
+
+   # mapping captures
+   : pattern {
+      regex          \= (->|=>|~>|>>|~\?)
+      styles []       = .operator;
+   }
+
+   # paren 
+   : inline_push {
+      regex          \= (\()
+      styles []       = .operator;
+      : pop {
+         regex       \= (\))
+         styles []    = .operator;
+      }
+      : include "main" ;
+   }
+
+   # backreferences
+   : pattern {
+      regex          \= (=$${__NAME}\b)
+      styles []       = .capture;
+   }
+
+   : inline_push {
+      regex          \= (\$\')
+      styles []       = .captureaux;
+      default_style   = .captureaux
+      : pop {
+         regex       \= (\')
+         styles []    = .captureaux;
+      }
+   }
+   : pattern {
+      regex          \= (\$\{\})
+      styles []       = .captureaux;
+   }
+   : pattern {
+      regex          \= (\$(?:[A-Za-z][A-Za-z0-9]+|[0-9]+))
+      styles []       = .captureaux;
+   }
+
+   # error labels
+   : pattern {
+      regex          \= (@)
+      styles []       = .captureaux;
+   }
+
+   # single ops
+   : pattern {
+      regex          \= ([&!\/?^*+$.])
+      styles []       = .operator;
+   }
+}
+
+string : context {
+   # char class
+   : inline_push {
+      regex          \= (\[(?:]|\^]|\^)?)
+      styles []       = .string;
+      default_style   = .string
+      : pop {
+         regex       \= (\])
+         styles []    = .string;
+      }
+   }
+
+   # strings
+   : inline_push {
+      regex          \= (\")
+      styles []       = .string;
+      default_style   = .string
+      : pop {
+         regex       \= (\")
+         styles []    = .string;
+      }
+   }
+   : inline_push {
+      regex          \= (\')
+      styles []       = .string;
+      default_style   = .string
+      : pop {
+         regex       \= (\')
+         styles []    = .string;
+      }
+   }
+   : inline_push {
+      regex          \= (\`)
+      styles []       = .string;
+      default_style   = .string
+      : pop {
+         regex       \= (\`)
+         styles []    = .string;
+      }
+   }
+}
+
+predef : context {
+   : pattern {
+      regex          \= (%$${__NAME}\b)
+      styles []       = .predef;
+   }
+}
+
+predeffn : context {
+   : pattern {
+      regex          \= (\b(?:tonil|totrue|tofalse|toemptytable|tonumber|tochar|toutf8char|foldleft|foldright|rfoldleft|rfoldright)\b)
+      styles []       = .predeffn;
+   }
+}
+
+predefrule : context {
+   : pattern {
+      regex          \= (\b(?:KEYWORD|TOKEN|NAME_SUFFIX|SKIP)\b)
+      styles []       = .predefrule;
+   }
+}
+
+capture : context {
+   # pos capture
+   : pattern {
+      regex          \= (\{\})
+      styles []       = .capture;
+   }
+
+   # table capture
+   : inline_push {
+      regex          \= (\{\|)
+      styles []       = .capture;
+      : pop {
+         regex       \= (\|\})
+         styles []    = .capture;
+      }
+      : include "main" ;
+   }
+
+   # subst capture
+   : inline_push {
+      regex          \= (\{~)
+      styles []       = .capture;
+      : pop {
+         regex       \= (~\})
+         styles []    = .capture;
+      }
+      : include "main" ;
+   }
+
+   # named group capture
+   : inline_push {
+      regex          \= (\{:$${__NAME}:)
+      styles []       = .capture;
+      : pop {
+         regex       \= (:\})
+         styles []    = .capture;
+      }
+      : include "main" ;
+   }
+
+   # group capture
+   : inline_push {
+      regex          \= (\{:)
+      styles []       = .capture;
+      : pop {
+         regex       \= (:\})
+         styles []    = .capture;
+      }
+      : include "main" ;
+   }
+
+   # simple capture
+   : inline_push {
+      regex          \= (\{)
+      styles []       = .capture;
+      : pop {
+         regex       \= (\})
+         styles []    = .capture;
+      }
+      : include "main" ;
+   }
+}
+
+
+   
+}
